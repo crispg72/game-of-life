@@ -2,8 +2,8 @@ import pygame
 import random
 
 
-GRID_SIZE = 50
-CELL_SIZE = 20
+GRID_SIZE = 200
+CELL_SIZE = 10
 
 
 def get_neighbours(grid, x, y):
@@ -19,10 +19,8 @@ def get_neighbours(grid, x, y):
     return num_neighbours
 
 
-def update_grid(source_grid):
-    destination_grid = []
+def update_grid(source_grid, destination_grid):
     for y in range(GRID_SIZE):
-        destination_grid.append([])
         for x in range(GRID_SIZE):
             num_neighbours = get_neighbours(source_grid, x, y)
 
@@ -39,9 +37,7 @@ def update_grid(source_grid):
                     next_generation = 1
 
             # All other live cells die in the next generation. Similarly, all other dead cells stay dead.
-            destination_grid[y].append(next_generation)
-
-    return destination_grid
+            destination_grid[y][x] = next_generation
 
 
 def main():
@@ -49,13 +45,16 @@ def main():
     win = pygame.display.set_mode((GRID_SIZE * CELL_SIZE, GRID_SIZE * CELL_SIZE))
     pygame.display.set_caption("Game Of Life")
 
-    grid = []
+    grids = [[], []]
     for y in range(GRID_SIZE):
-        grid.append([])
+        grids[0].append([])
+        grids[1].append([])
         for x in range(GRID_SIZE):
-            grid[y].append(random.randrange(2))
+            grids[0][y].append(random.randrange(2))
+            grids[1][y].append(0)
 
     run = True
+    source = 0
     while run:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -64,6 +63,7 @@ def main():
         background = (0, 0, 0)
         win.fill(background)
 
+        grid = grids[source]
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
                 if grid[y][x] == 1:
@@ -80,7 +80,8 @@ def main():
 
         pygame.display.flip()
 
-        grid = update_grid(grid)
+        update_grid(grids[source], grids[source ^ 1])
+        source = (source + 1) % 2
         pygame.time.Clock().tick(60)
 
     pygame.quit()
