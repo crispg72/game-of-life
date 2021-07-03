@@ -22,19 +22,22 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
 
-
         background = (0, 0, 0)
         win.fill(background)
 
         for y in range(GRID_SIZE):
             for x in range(GRID_SIZE):
                 if grid[y][x] == 1:
-                    pygame.draw.rect(win, (0, 255, 0), ( 
-                                x * CELL_SIZE,
-                                y * CELL_SIZE,
-                                (x * CELL_SIZE) + CELL_SIZE,
-                                (y * CELL_SIZE) + CELL_SIZE,
-                            ), 1)
+                    pygame.draw.rect(
+                        win,
+                        (0, 255, 0),
+                        (
+                            x * CELL_SIZE,
+                            y * CELL_SIZE,
+                            CELL_SIZE,
+                            CELL_SIZE,
+                        ),
+                    )
 
         pygame.display.flip()
         pygame.time.Clock().tick(60)
