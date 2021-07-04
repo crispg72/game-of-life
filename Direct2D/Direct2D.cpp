@@ -32,6 +32,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+void Render();
 
 ID2D1Factory* m_pDirect2dFactory;
 ID2D1HwndRenderTarget* m_pRenderTarget;
@@ -62,28 +63,73 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_DIRECT2D));
 
-        MSG msg;
-
         // Main message loop:
-        while (GetMessage(&msg, nullptr, 0, 0))
+        while (true)
         {
-            if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+            MSG msg;
+            while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
             {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
             }
+
+            if (msg.message == WM_QUIT)
+            {
+                break;
+            }
+
+            // Do update, rendering and all the real game loop stuff
+            Render();
         }
 
         SafeRelease(&m_pDirect2dFactory);
         SafeRelease(&m_pRenderTarget);
         SafeRelease(&m_pCornflowerBlueBrush);
 
-        return (int)msg.wParam;
+        return 0;
     }
     return -1;
 }
 
+float size = 50.0f;
+float grow = 1.0f;
 
+void Render()
+{
+    m_pRenderTarget->BeginDraw();
+    m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+    m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+
+    D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
+
+    // Draw two rectangles.
+    D2D1_RECT_F rectangle1 = D2D1::RectF(
+        rtSize.width / 2 - size,
+        rtSize.height / 2 - size,
+        rtSize.width / 2 + size,
+        rtSize.height / 2 + size
+    );
+
+    D2D1_RECT_F rectangle2 = D2D1::RectF(
+        rtSize.width / 2 - (size*2.0f),
+        rtSize.height / 2 - (size * 2.0f),
+        rtSize.width / 2 + (size * 2.0f),
+        rtSize.height / 2 + (size * 2.0f)
+    );
+    m_pRenderTarget->FillRectangle(&rectangle1, m_pCornflowerBlueBrush);
+    //m_pRenderTarget->FillRectangle(&rectangle2, m_pCornflowerBlueBrush);
+
+    size += grow;
+    if ((size > 100.0f) || (size < 20.0f))
+    {
+        grow = -grow;
+    }
+
+    HRESULT hr = m_pRenderTarget->EndDraw();
+}
 
 //
 //  FUNCTION: MyRegisterClass()
@@ -196,32 +242,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_PAINT:
         {
-            m_pRenderTarget->BeginDraw();
-            m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
-            m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
-
-            D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
-
-            // Draw two rectangles.
-            D2D1_RECT_F rectangle1 = D2D1::RectF(
-                rtSize.width / 2 - 50.0f,
-                rtSize.height / 2 - 50.0f,
-                rtSize.width / 2 + 50.0f,
-                rtSize.height / 2 + 50.0f
-            );
-
-            D2D1_RECT_F rectangle2 = D2D1::RectF(
-                rtSize.width / 2 - 100.0f,
-                rtSize.height / 2 - 100.0f,
-                rtSize.width / 2 + 100.0f,
-                rtSize.height / 2 + 100.0f
-            );
-            m_pRenderTarget->FillRectangle(&rectangle1, m_pCornflowerBlueBrush);
-            m_pRenderTarget->FillRectangle(&rectangle2, m_pCornflowerBlueBrush);
-
             ValidateRect(hWnd, NULL);
-
-            HRESULT hr = m_pRenderTarget->EndDraw();
         }
         break;
     case WM_DESTROY:
