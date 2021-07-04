@@ -134,7 +134,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    }
 
    ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
 
    RECT rc;
    GetClientRect(hWnd, &rc);
@@ -159,6 +158,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
            &m_pCornflowerBlueBrush
        );
    }
+   UpdateWindow(hWnd);
+
    return TRUE;
 }
 
@@ -195,10 +196,32 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_PAINT:
         {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            EndPaint(hWnd, &ps);
+            m_pRenderTarget->BeginDraw();
+            m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
+            m_pRenderTarget->Clear(D2D1::ColorF(D2D1::ColorF::White));
+
+            D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
+
+            // Draw two rectangles.
+            D2D1_RECT_F rectangle1 = D2D1::RectF(
+                rtSize.width / 2 - 50.0f,
+                rtSize.height / 2 - 50.0f,
+                rtSize.width / 2 + 50.0f,
+                rtSize.height / 2 + 50.0f
+            );
+
+            D2D1_RECT_F rectangle2 = D2D1::RectF(
+                rtSize.width / 2 - 100.0f,
+                rtSize.height / 2 - 100.0f,
+                rtSize.width / 2 + 100.0f,
+                rtSize.height / 2 + 100.0f
+            );
+            m_pRenderTarget->FillRectangle(&rectangle1, m_pCornflowerBlueBrush);
+            m_pRenderTarget->FillRectangle(&rectangle2, m_pCornflowerBlueBrush);
+
+            ValidateRect(hWnd, NULL);
+
+            HRESULT hr = m_pRenderTarget->EndDraw();
         }
         break;
     case WM_DESTROY:
