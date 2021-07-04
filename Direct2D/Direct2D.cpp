@@ -35,7 +35,6 @@ INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 ID2D1Factory* m_pDirect2dFactory;
 ID2D1HwndRenderTarget* m_pRenderTarget;
-ID2D1SolidColorBrush* m_pLightSlateGrayBrush;
 ID2D1SolidColorBrush* m_pCornflowerBlueBrush;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -76,6 +75,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
 
         SafeRelease(&m_pDirect2dFactory);
+        SafeRelease(&m_pRenderTarget);
+        SafeRelease(&m_pCornflowerBlueBrush);
+
         return (int)msg.wParam;
     }
     return -1;
@@ -134,6 +136,29 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
+   RECT rc;
+   GetClientRect(hWnd, &rc);
+
+   D2D1_SIZE_U size = D2D1::SizeU(
+       rc.right - rc.left,
+       rc.bottom - rc.top
+   );
+
+   // Create a Direct2D render target.
+   HRESULT hr = m_pDirect2dFactory->CreateHwndRenderTarget(
+       D2D1::RenderTargetProperties(),
+       D2D1::HwndRenderTargetProperties(hWnd, size),
+       &m_pRenderTarget
+   );
+
+   if (SUCCEEDED(hr))
+   {
+       // Create a blue brush.
+       hr = m_pRenderTarget->CreateSolidColorBrush(
+           D2D1::ColorF(D2D1::ColorF::CornflowerBlue),
+           &m_pCornflowerBlueBrush
+       );
+   }
    return TRUE;
 }
 
