@@ -27,11 +27,18 @@ HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
+// Define our game of life grid
+const int grid_size = 200;
+unsigned char grid1[grid_size][grid_size];
+unsigned char grid2[grid_size][grid_size];
+unsigned char* grids[2];
+
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+void initialise_grid(unsigned char *pGrid);
 void Render();
 
 ID2D1Factory* m_pDirect2dFactory;
@@ -62,6 +69,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
 
         HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_DIRECT2D));
+
+        initialise_grid(&grid1[0][0]);
 
         // Main message loop:
         while (true)
@@ -94,8 +103,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     return -1;
 }
 
-float size = 50.0f;
-float grow = 1.0f;
+void initialise_grid(unsigned char* pGrid)
+{
+    for (int y = 0; y < grid_size; ++y)
+    {
+        for (int x = 0; x < grid_size; ++x)
+        {
+            *(pGrid + ((y * grid_size) + x)) = (unsigned char)(rand() & 1);
+        }
+    }
+}
 
 void Render()
 {
@@ -105,29 +122,26 @@ void Render()
 
     D2D1_SIZE_F rtSize = m_pRenderTarget->GetSize();
 
-    // Draw two rectangles.
-    D2D1_RECT_F rectangle1 = D2D1::RectF(
-        rtSize.width / 2 - size,
-        rtSize.height / 2 - size,
-        rtSize.width / 2 + size,
-        rtSize.height / 2 + size
-    );
+    float cell_size_x = rtSize.width / grid_size;
+    float cell_size_y = rtSize.height / grid_size;
 
-    D2D1_RECT_F rectangle2 = D2D1::RectF(
-        rtSize.width / 2 - (size*2.0f),
-        rtSize.height / 2 - (size * 2.0f),
-        rtSize.width / 2 + (size * 2.0f),
-        rtSize.height / 2 + (size * 2.0f)
-    );
-    m_pRenderTarget->FillRectangle(&rectangle1, m_pCornflowerBlueBrush);
-    //m_pRenderTarget->FillRectangle(&rectangle2, m_pCornflowerBlueBrush);
-
-    size += grow;
-    if ((size > 100.0f) || (size < 20.0f))
+    for (int y = 0; y < grid_size; ++y)
     {
-        grow = -grow;
-    }
+        for (int x = 0; x < grid_size; ++x)
+        {
+            if (grid1[y][x])
+            {
+                D2D1_RECT_F rectangle1 = D2D1::RectF(
+                    x * cell_size_x,
+                    y * cell_size_y,
+                    (x * cell_size_x) + cell_size_x,
+                    (y * cell_size_y) + cell_size_y
+                );
 
+                m_pRenderTarget->FillRectangle(&rectangle1, m_pCornflowerBlueBrush);
+            }
+        }
+    }
     HRESULT hr = m_pRenderTarget->EndDraw();
 }
 
