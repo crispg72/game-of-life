@@ -29,9 +29,10 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 // Define our game of life grid
 const int grid_size = 200;
+int current_grid = 0;
 unsigned char grid1[grid_size][grid_size];
 unsigned char grid2[grid_size][grid_size];
-unsigned char* grids[2];
+unsigned char* grids[2] = { &grid1[0][0], &grid2[0][0] };
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -39,7 +40,8 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 void initialise_grid(unsigned char *pGrid);
-void Render();
+void Update(unsigned char*, unsigned char*);
+void Render(unsigned char *);
 
 ID2D1Factory* m_pDirect2dFactory;
 ID2D1HwndRenderTarget* m_pRenderTarget;
@@ -91,7 +93,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             }
 
             // Do update, rendering and all the real game loop stuff
-            Render();
+            Update(grids[current_grid], grids[current_grid ^ 1]);
+            Render(grids[current_grid]);
+            current_grid = (current_grid + 1) % 2;
         }
 
         SafeRelease(&m_pDirect2dFactory);
@@ -114,7 +118,52 @@ void initialise_grid(unsigned char* pGrid)
     }
 }
 
-void Render()
+unsigned char get_grid_value(unsigned char* pGrid, int x, int y)
+{
+    return *(pGrid + (y * grid_size) + x);
+}
+
+void Update(unsigned char* pSourceGrid, unsigned char* pDestGrid)
+{
+    for (int y = 0; y < grid_size; ++y)
+    {
+        for (int x = 0; x < grid_size; ++x)
+        {
+            unsigned char num_neighbours = get_grid_value(pSourceGrid, (x - 1) % grid_size, (y - 1) % grid_size);
+            num_neighbours += get_grid_value(pSourceGrid, x, (y - 1) % grid_size);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % grid_size, (y - 1) % grid_size);
+            num_neighbours += get_grid_value(pSourceGrid, (x - 1) % grid_size, y);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % grid_size, y);
+            num_neighbours += get_grid_value(pSourceGrid, (x - 1) % grid_size, (y + 1) % grid_size);
+            num_neighbours += get_grid_value(pSourceGrid, x, (y + 1) % grid_size);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % grid_size, (y + 1) % grid_size);
+
+            unsigned char next_generation = 0;
+
+            // Any live cell with two or three live neighbours survives.
+            if (get_grid_value(pSourceGrid, x, y) == 1)
+            {
+                // Any live cell with two or three live neighbours survives.
+                if ((num_neighbours > 1) && (num_neighbours < 4))
+                {
+                    next_generation = 1;
+                }
+            }
+            else
+            {
+                // Any dead cell with three live neighbours becomes a live cell.
+                if (num_neighbours == 3)
+                {
+                    next_generation = 1;
+                }
+            }
+            // All other live cells die in the next generation.Similarly, all other dead cells stay dead.
+            *(pDestGrid + (y * grid_size) + x) = next_generation;
+        }
+    }
+}
+
+void Render(unsigned char *pGrid)
 {
     m_pRenderTarget->BeginDraw();
     m_pRenderTarget->SetTransform(D2D1::Matrix3x2F::Identity());
@@ -129,7 +178,8 @@ void Render()
     {
         for (int x = 0; x < grid_size; ++x)
         {
-            if (grid1[y][x])
+            unsigned char *this_cell = pGrid + (y * grid_size) + x;
+            if (*this_cell)
             {
                 D2D1_RECT_F rectangle1 = D2D1::RectF(
                     x * cell_size_x,
