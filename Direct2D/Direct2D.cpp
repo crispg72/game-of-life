@@ -53,7 +53,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &m_pDirect2dFactory);
 
     if (SUCCEEDED(hr)) {
@@ -73,7 +72,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         initialise_grid(&grid1[0][0]);
 
         // Main message loop:
-        while (true)
+        bool running = true;
+        while (running)
         {
             MSG msg;
             while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
@@ -83,11 +83,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                     TranslateMessage(&msg);
                     DispatchMessage(&msg);
                 }
-            }
 
-            if (msg.message == WM_QUIT)
-            {
-                break;
+                if (msg.message == WM_QUIT)
+                {
+                    running = false;
+                }
             }
 
             // Do update, rendering and all the real game loop stuff
