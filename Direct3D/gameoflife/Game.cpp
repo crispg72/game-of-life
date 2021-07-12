@@ -11,6 +11,12 @@ using namespace DirectX;
 
 using Microsoft::WRL::ComPtr;
 
+struct Vertex {
+    Vertex(float x, float y, float z, float u, float v) : pos(x, y, z), texCoord(u, v) {}
+    XMFLOAT3 pos;
+    XMFLOAT2 texCoord;
+};
+
 Game::Game() noexcept :
     m_window(nullptr),
     m_outputWidth(800),
@@ -79,6 +85,7 @@ void Game::Render()
     Clear();
 
     // TODO: Add your rendering code here.
+    DrawCubes();
 
     // Show the new frame.
     Present();
@@ -109,6 +116,29 @@ void Game::Clear()
     D3D12_RECT scissorRect = { 0, 0, static_cast<LONG>(m_outputWidth), static_cast<LONG>(m_outputHeight) };
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissorRect);
+}
+
+void Game::DrawCubes()
+{
+    /*m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST); // set the primitive topology
+    m_commandList->IASetVertexBuffers(0, 1, &vertexBufferView); // set the vertex buffer (using the vertex buffer view)
+    m_commandList->IASetIndexBuffer(&indexBufferView);
+
+    // draw cubes
+    for (UINT64 y = 0; y < gridSize; ++y)
+    {
+        for (UINT64 x = 0; x < gridSize; ++x)
+        {
+            if (lifeGrids[currentGrid][y][x])
+            {
+                // set cube's constant buffer
+                m_commandList->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + (((y * gridSize) + x) * ConstantBufferPerObjectAlignedSize));
+
+                // draw first cube
+                m_commandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+            }
+        }
+    }*/
 }
 
 // Submits the command list to the GPU and presents the back buffer contents to the screen.
@@ -376,6 +406,8 @@ void Game::CreateResources()
     // Reset the index to the current back buffer.
     m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
 
+    CreateCubeBuffers();
+    
     // Allocate a 2-D surface as the depth/stencil buffer and create a depth/stencil view
     // on this surface.
     CD3DX12_HEAP_PROPERTIES depthHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
@@ -519,4 +551,336 @@ void Game::OnDeviceLost()
 
     CreateDevice();
     CreateResources();
+}
+
+void Game::CreateCubeBuffers()
+{
+    HRESULT hr;
+    ID3DBlob* errorBuff; // a buffer holding the error data if any
+
+    // create root signature
+
+    // create a root descriptor, which explains where to find the data for this root parameter
+    D3D12_ROOT_DESCRIPTOR rootCBVDescriptor;
+    rootCBVDescriptor.RegisterSpace = 0;
+    rootCBVDescriptor.ShaderRegister = 0;
+
+    // create a descriptor range (descriptor table) and fill it out
+    // this is a range of descriptors inside a descriptor heap
+    D3D12_DESCRIPTOR_RANGE  descriptorTableRanges[1]; // only one range right now
+    descriptorTableRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // this is a range of shader resource views (descriptors)
+    descriptorTableRanges[0].NumDescriptors = 1; // we only have one texture right now, so the range is only 1
+    descriptorTableRanges[0].BaseShaderRegister = 0; // start index of the shader registers in the range
+    descriptorTableRanges[0].RegisterSpace = 0; // space 0. can usually be zero
+    descriptorTableRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // this appends the range to the end of the root signature descriptor tables
+
+    // create a descriptor table
+    D3D12_ROOT_DESCRIPTOR_TABLE descriptorTable;
+    descriptorTable.NumDescriptorRanges = _countof(descriptorTableRanges); // we only have one range
+    descriptorTable.pDescriptorRanges = &descriptorTableRanges[0]; // the pointer to the beginning of our ranges array
+
+    // create a root parameter for the root descriptor and fill it out
+    D3D12_ROOT_PARAMETER  rootParameters[2]; // only one parameter right now
+    rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV; // this is a constant buffer view root descriptor
+    rootParameters[0].Descriptor = rootCBVDescriptor; // this is the root descriptor for this root parameter
+    rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX; // our pixel shader will be the only shader accessing this parameter for now
+
+    // fill out the parameter for our descriptor table. Remember it's a good idea to sort parameters by frequency of change. Our constant
+    // buffer will be changed multiple times per frame, while our descriptor table will not be changed at all (in this tutorial)
+    rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE; // this is a descriptor table
+    rootParameters[1].DescriptorTable = descriptorTable; // this is our descriptor table for this root parameter
+    rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL; // our pixel shader will be the only shader accessing this parameter for now
+
+    // create a static sampler
+    D3D12_STATIC_SAMPLER_DESC sampler = {};
+    sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+    sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+    sampler.MipLODBias = 0;
+    sampler.MaxAnisotropy = 0;
+    sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+    sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+    sampler.MinLOD = 0.0f;
+    sampler.MaxLOD = D3D12_FLOAT32_MAX;
+    sampler.ShaderRegister = 0;
+    sampler.RegisterSpace = 0;
+    sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+    CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+    rootSignatureDesc.Init(_countof(rootParameters), // we have 2 root parameters
+        rootParameters, // a pointer to the beginning of our root parameters array
+        1, // we have one static sampler
+        &sampler, // a pointer to our static sampler (array)
+        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT | // we can deny shader stages here for better performance
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+        D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS);
+
+    ID3DBlob* signature;
+    DX::ThrowIfFailed(D3D12SerializeRootSignature(
+        &rootSignatureDesc, 
+        D3D_ROOT_SIGNATURE_VERSION_1, 
+        &signature, 
+        &errorBuff
+    ));
+
+    DX::ThrowIfFailed(m_d3dDevice->CreateRootSignature(
+        0, 
+        signature->GetBufferPointer(), 
+        signature->GetBufferSize(), 
+        IID_PPV_ARGS(&m_rootSignature)
+    ));
+
+    // create vertex and pixel shaders
+
+    // when debugging, we can compile the shader files at runtime.
+    // but for release versions, we can compile the hlsl shaders
+    // with fxc.exe to create .cso files, which contain the shader
+    // bytecode. We can load the .cso files at runtime to get the
+    // shader bytecode, which of course is faster than compiling
+    // them at runtime
+
+    // compile vertex shader
+    ID3DBlob* vertexShader; // d3d blob for holding vertex shader bytecode
+    DX::ThrowIfFailed(D3DCompileFromFile(L"VertexShader.hlsl",
+        nullptr,
+        nullptr,
+        "main",
+        "vs_5_0",
+        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+        0,
+        &vertexShader,
+        &errorBuff));
+
+    // fill out a shader bytecode structure, which is basically just a pointer
+    // to the shader bytecode and the size of the shader bytecode
+    D3D12_SHADER_BYTECODE vertexShaderBytecode = {};
+    vertexShaderBytecode.BytecodeLength = vertexShader->GetBufferSize();
+    vertexShaderBytecode.pShaderBytecode = vertexShader->GetBufferPointer();
+
+    // compile pixel shader
+    ID3DBlob* pixelShader;
+    DX::ThrowIfFailed(D3DCompileFromFile(L"PixelShader.hlsl",
+        nullptr,
+        nullptr,
+        "main",
+        "ps_5_0",
+        D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION,
+        0,
+        &pixelShader,
+        &errorBuff));
+
+    // fill out shader bytecode structure for pixel shader
+    D3D12_SHADER_BYTECODE pixelShaderBytecode = {};
+    pixelShaderBytecode.BytecodeLength = pixelShader->GetBufferSize();
+    pixelShaderBytecode.pShaderBytecode = pixelShader->GetBufferPointer();
+
+    // create input layout
+
+    // The input layout is used by the Input Assembler so that it knows
+    // how to read the vertex data bound to it.
+
+    D3D12_INPUT_ELEMENT_DESC inputLayout[] =
+    {
+        { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+    };
+
+    // fill out an input layout description structure
+    D3D12_INPUT_LAYOUT_DESC inputLayoutDesc = {};
+
+    // we can get the number of elements in an array by "sizeof(array) / sizeof(arrayElementType)"
+    inputLayoutDesc.NumElements = sizeof(inputLayout) / sizeof(D3D12_INPUT_ELEMENT_DESC);
+    inputLayoutDesc.pInputElementDescs = inputLayout;
+
+    DXGI_SAMPLE_DESC sampleDesc = {};
+    sampleDesc.Count = 1; // multisample count (no multisampling, so we just put 1, since we still need 1 sample)
+
+    // create a pipeline state object (PSO)
+
+    // In a real application, you will have many pso's. for each different shader
+    // or different combinations of shaders, different blend states or different rasterizer states,
+    // different topology types (point, line, triangle, patch), or a different number
+    // of render targets you will need a pso
+
+    // VS is the only required shader for a pso. You might be wondering when a case would be where
+    // you only set the VS. It's possible that you have a pso that only outputs data with the stream
+    // output, and not on a render target, which means you would not need anything after the stream
+    // output.
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {}; // a structure to define a pso
+    psoDesc.InputLayout = inputLayoutDesc; // the structure describing our input layout
+    psoDesc.pRootSignature = m_rootSignature; // the root signature that describes the input data this pso needs
+    psoDesc.VS = vertexShaderBytecode; // structure describing where to find the vertex shader bytecode and how large it is
+    psoDesc.PS = pixelShaderBytecode; // same as VS but for pixel shader
+    psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE; // type of topology we are drawing
+    psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM; // format of the render target
+    psoDesc.SampleDesc = sampleDesc; // must be the same sample description as the swapchain and depth/stencil buffer
+    psoDesc.SampleMask = 0xffffffff; // sample mask has to do with multi-sampling. 0xffffffff means point sampling is done
+    psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT); // a default rasterizer state.
+    psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT); // a default blent state.
+    psoDesc.NumRenderTargets = 1; // we are only binding one render target
+    psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT); // a default depth stencil state
+
+    // create the pso
+    DX::ThrowIfFailed(m_d3dDevice->CreateGraphicsPipelineState(
+        &psoDesc, 
+        IID_PPV_ARGS(&m_pipelineStateObject)));
+
+    // Create vertex buffer
+
+    // a quad
+    Vertex vList[] = {
+        // front face
+        { -0.5f,  0.5f, -0.5f, 0.0f, 0.0f },
+        {  0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
+        { -0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
+        {  0.5f,  0.5f, -0.5f, 1.0f, 0.0f },
+
+        // right side face
+        {  0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
+        {  0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
+        {  0.5f, -0.5f,  0.5f, 1.0f, 1.0f },
+        {  0.5f,  0.5f, -0.5f, 0.0f, 0.0f },
+
+        // left side face
+        { -0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
+        { -0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
+        { -0.5f, -0.5f,  0.5f, 0.0f, 1.0f },
+        { -0.5f,  0.5f, -0.5f, 1.0f, 0.0f },
+
+        // back face
+        {  0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
+        { -0.5f, -0.5f,  0.5f, 1.0f, 1.0f },
+        {  0.5f, -0.5f,  0.5f, 0.0f, 1.0f },
+        { -0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
+
+        // top face
+        { -0.5f,  0.5f, -0.5f, 0.0f, 1.0f },
+        {  0.5f,  0.5f,  0.5f, 1.0f, 0.0f },
+        {  0.5f,  0.5f, -0.5f, 1.0f, 1.0f },
+        { -0.5f,  0.5f,  0.5f, 0.0f, 0.0f },
+
+        // bottom face
+        {  0.5f, -0.5f,  0.5f, 0.0f, 0.0f },
+        { -0.5f, -0.5f, -0.5f, 1.0f, 1.0f },
+        {  0.5f, -0.5f, -0.5f, 0.0f, 1.0f },
+        { -0.5f, -0.5f,  0.5f, 1.0f, 0.0f },
+    };
+
+    int vBufferSize = sizeof(vList);
+
+    // create default heap
+    // default heap is memory on the GPU. Only the GPU has access to this memory
+    // To get data into this heap, we will have to upload the data using
+    // an upload heap
+    DX::ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
+        D3D12_HEAP_FLAG_NONE, // no flags
+        &CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
+        D3D12_RESOURCE_STATE_COPY_DEST, // we will start this heap in the copy destination state since we will copy data
+                                        // from the upload heap to this heap
+        nullptr, // optimized clear value must be null for this type of resource. used for render targets and depth/stencil buffers
+        IID_PPV_ARGS(&m_cubeVertexBuffer)));
+
+    // we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
+    m_cubeVertexBuffer->SetName(L"Vertex Buffer Resource Heap");
+
+    // create upload heap
+    // upload heaps are used to upload data to the GPU. CPU can write to it, GPU can read from it
+    // We will upload the vertex buffer using this heap to the default heap
+    ID3D12Resource* vBufferUploadHeap;
+    DX::ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
+        D3D12_HEAP_FLAG_NONE, // no flags
+        &CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
+        D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
+        nullptr,
+        IID_PPV_ARGS(&vBufferUploadHeap)));
+
+    vBufferUploadHeap->SetName(L"Vertex Buffer Upload Resource Heap");
+
+    // store vertex buffer in upload heap
+    D3D12_SUBRESOURCE_DATA vertexData = {};
+    vertexData.pData = reinterpret_cast<BYTE*>(vList); // pointer to our vertex array
+    vertexData.RowPitch = vBufferSize; // size of all our triangle vertex data
+    vertexData.SlicePitch = vBufferSize; // also the size of our triangle vertex data
+
+    // we are now creating a command with the command list to copy the data from
+    // the upload heap to the default heap
+    UpdateSubresources(m_commandList.Get(), m_cubeVertexBuffer, vBufferUploadHeap, 0, 0, 1, &vertexData);
+
+    // transition the vertex buffer data from copy destination state to vertex buffer state
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_cubeVertexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+    // Create index buffer
+
+    // a quad (2 triangles)
+    DWORD iList[] = {
+        // ffront face
+        0, 1, 2, // first triangle
+        0, 3, 1, // second triangle
+
+        // left face
+        4, 5, 6, // first triangle
+        4, 7, 5, // second triangle
+
+        // right face
+        8, 9, 10, // first triangle
+        8, 11, 9, // second triangle
+
+        // back face
+        12, 13, 14, // first triangle
+        12, 15, 13, // second triangle
+
+        // top face
+        16, 17, 18, // first triangle
+        16, 19, 17, // second triangle
+
+        // bottom face
+        20, 21, 22, // first triangle
+        20, 23, 21, // second triangle
+    };
+
+    int iBufferSize = sizeof(iList);
+
+    m_numCubeIndices = sizeof(iList) / sizeof(DWORD);
+
+    // create default heap to hold index buffer
+    DX::ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT), // a default heap
+        D3D12_HEAP_FLAG_NONE, // no flags
+        &CD3DX12_RESOURCE_DESC::Buffer(iBufferSize), // resource description for a buffer
+        D3D12_RESOURCE_STATE_COPY_DEST, // start in the copy destination state
+        nullptr, // optimized clear value must be null for this type of resource
+        IID_PPV_ARGS(&m_cubeIndexBuffer)));
+
+    // we can give resource heaps a name so when we debug with the graphics debugger we know what resource we are looking at
+    m_cubeIndexBuffer->SetName(L"Index Buffer Resource Heap");
+
+    // create upload heap to upload index buffer
+    ID3D12Resource* iBufferUploadHeap;
+    DX::ThrowIfFailed(m_d3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), // upload heap
+        D3D12_HEAP_FLAG_NONE, // no flags
+        &CD3DX12_RESOURCE_DESC::Buffer(vBufferSize), // resource description for a buffer
+        D3D12_RESOURCE_STATE_GENERIC_READ, // GPU will read from this buffer and copy its contents to the default heap
+        nullptr,
+        IID_PPV_ARGS(&iBufferUploadHeap)));
+    
+    vBufferUploadHeap->SetName(L"Index Buffer Upload Resource Heap");
+
+    // store vertex buffer in upload heap
+    D3D12_SUBRESOURCE_DATA indexData = {};
+    indexData.pData = reinterpret_cast<BYTE*>(iList); // pointer to our index array
+    indexData.RowPitch = iBufferSize; // size of all our index buffer
+    indexData.SlicePitch = iBufferSize; // also the size of our index buffer
+
+    // we are now creating a command with the command list to copy the data from
+    // the upload heap to the default heap
+    UpdateSubresources(m_commandList.Get(), m_cubeIndexBuffer, iBufferUploadHeap, 0, 0, 1, &indexData);
+
+    // transition the vertex buffer data from copy destination state to vertex buffer state
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_cubeIndexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 }
