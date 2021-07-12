@@ -28,7 +28,7 @@ WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 
 // Define our game of life grid
-const int grid_size = 200;
+const int grid_size = 800;
 int current_grid = 0;
 unsigned char grid1[grid_size][grid_size];
 unsigned char grid2[grid_size][grid_size];
