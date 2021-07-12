@@ -6,7 +6,6 @@
 
 #include "StepTimer.h"
 
-
 // A basic game implementation that creates a D3D12 device and
 // provides a game loop.
 class Game
@@ -44,6 +43,8 @@ private:
     void Render();
 
     void Clear();
+    void CreateCubeBuffers();
+    void DrawCubes();
     void Present();
 
     void CreateDevice();
@@ -68,6 +69,10 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Device>                m_d3dDevice;
     Microsoft::WRL::ComPtr<IDXGIFactory4>               m_dxgiFactory;
     Microsoft::WRL::ComPtr<ID3D12CommandQueue>          m_commandQueue;
+    ID3D12RootSignature*                                m_rootSignature;
+    ID3D12PipelineState*                                m_pipelineStateObject;
+    ID3D12Resource*                                     m_cubeVertexBuffer;
+    ID3D12Resource*                                     m_cubeIndexBuffer;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_rtvDescriptorHeap;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_dsvDescriptorHeap;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator>      m_commandAllocators[c_swapBufferCount];
@@ -83,4 +88,6 @@ private:
 
     // Game state
     DX::StepTimer                                       m_timer;
+
+    int                                                 m_numCubeIndices;
 };
