@@ -46,6 +46,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include <wincodec.h>
+
 #ifdef _DEBUG
 #include <dxgidebug.h>
 #endif
