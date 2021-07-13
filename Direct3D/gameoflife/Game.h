@@ -56,6 +56,8 @@ private:
 
     void OnDeviceLost();
 
+    int LoadImageDataFromFile(BYTE** imageData, D3D12_RESOURCE_DESC& resourceDescription, LPCWSTR filename, int& bytesPerRow);
+
     // Application state
     HWND                                                m_window;
     int                                                 m_outputWidth;
@@ -85,6 +87,8 @@ private:
     Microsoft::WRL::ComPtr<IDXGISwapChain3>             m_swapChain;
     Microsoft::WRL::ComPtr<ID3D12Resource>              m_renderTargets[c_swapBufferCount];
     Microsoft::WRL::ComPtr<ID3D12Resource>              m_depthStencil;
+    Microsoft::WRL::ComPtr<ID3D12Resource>              m_constantBufferUploadHeaps[c_swapBufferCount];
+
 
     // Game state
     DX::StepTimer                                       m_timer;
