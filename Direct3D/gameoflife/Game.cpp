@@ -300,7 +300,6 @@ void Game::CreateDevice()
 
     // Create a command list for recording graphics commands.
     DX::ThrowIfFailed(m_d3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(m_commandList.ReleaseAndGetAddressOf())));
-    DX::ThrowIfFailed(m_commandList->Close());
 
     // Create a fence for tracking GPU execution progress.
     DX::ThrowIfFailed(m_d3dDevice->CreateFence(m_fenceValues[m_backBufferIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.ReleaseAndGetAddressOf())));
@@ -883,4 +882,14 @@ void Game::CreateCubeBuffers()
 
     // transition the vertex buffer data from copy destination state to vertex buffer state
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_cubeIndexBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+
+    // Now we execute the command list to upload the initial assets (triangle data)
+    m_commandList->Close();
+    ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+    m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+    // increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
+    //fenceValue[frameIndex]++;
+    //DX::ThrowIfFailed(m_commandList->Signal(fence[frameIndex], fenceValue[frameIndex]));
+    WaitForGpu();
 }
