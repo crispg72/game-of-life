@@ -43,7 +43,7 @@ private:
     void Render();
 
     void Clear();
-    void CreateCubeBuffers();
+    void CreateCubeBuffers(DXGI_FORMAT, UINT, UINT);
     void DrawCubes();
     void Present();
 
@@ -77,21 +77,29 @@ private:
     ID3D12Resource*                                     m_cubeIndexBuffer;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_rtvDescriptorHeap;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_dsvDescriptorHeap;
+    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>        m_dsDescriptorHeap;
+    ID3D12DescriptorHeap*                               m_textureDescriptorHeap;
     Microsoft::WRL::ComPtr<ID3D12CommandAllocator>      m_commandAllocators[c_swapBufferCount];
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>   m_commandList;
-    Microsoft::WRL::ComPtr<ID3D12Fence>                 m_fence;
+    Microsoft::WRL::ComPtr<ID3D12Fence>                 m_fences[c_swapBufferCount];
     UINT64                                              m_fenceValues[c_swapBufferCount];
-    Microsoft::WRL::Wrappers::Event                     m_fenceEvent;
+    //Microsoft::WRL::Wrappers::Event                     m_fenceEvent;
+    HANDLE                                              m_fenceEvent;
 
     // Rendering resources
     Microsoft::WRL::ComPtr<IDXGISwapChain3>             m_swapChain;
     Microsoft::WRL::ComPtr<ID3D12Resource>              m_renderTargets[c_swapBufferCount];
     Microsoft::WRL::ComPtr<ID3D12Resource>              m_depthStencil;
     Microsoft::WRL::ComPtr<ID3D12Resource>              m_constantBufferUploadHeaps[c_swapBufferCount];
+    UINT8*                                              m_cbvGPUAddress[c_swapBufferCount];
+
+    int                                                 m_numCubeIndices;
+
+    D3D12_VERTEX_BUFFER_VIEW                            m_vertexBufferView;
+    D3D12_INDEX_BUFFER_VIEW                             m_indexBufferView;
+
 
 
     // Game state
     DX::StepTimer                                       m_timer;
-
-    int                                                 m_numCubeIndices;
 };
