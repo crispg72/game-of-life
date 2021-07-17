@@ -24,7 +24,8 @@ Game::Game() noexcept :
     m_featureLevel(D3D_FEATURE_LEVEL_11_0),
     m_backBufferIndex(0),
     m_rtvDescriptorSize(0),
-    m_fenceValues{}
+    m_fenceValues{},
+    m_currentGrid(0)
 {
 }
 
@@ -63,12 +64,78 @@ void Game::Tick()
     Render();
 }
 
+void Game::initialise_grid(unsigned char* pGrid)
+{
+    for (int y = 0; y < c_gridSize; ++y)
+    {
+        for (int x = 0; x < c_gridSize; ++x)
+        {
+            *(pGrid + ((y * c_gridSize) + x)) = (unsigned char)(rand() & 1);
+        }
+    }
+}
+
+unsigned char Game::get_grid_value(unsigned char* pGrid, int x, int y)
+{
+    return *(pGrid + (y * c_gridSize) + x);
+}
+
+void Game::update_grid(unsigned char* pSourceGrid, unsigned char* pDestGrid)
+{
+    for (int y = 0; y < c_gridSize; ++y)
+    {
+        for (int x = 0; x < c_gridSize; ++x)
+        {
+            unsigned char num_neighbours = get_grid_value(pSourceGrid, (x - 1) % c_gridSize, (y - 1) % c_gridSize);
+            num_neighbours += get_grid_value(pSourceGrid, x, (y - 1) % c_gridSize);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % c_gridSize, (y - 1) % c_gridSize);
+            num_neighbours += get_grid_value(pSourceGrid, (x - 1) % c_gridSize, y);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % c_gridSize, y);
+            num_neighbours += get_grid_value(pSourceGrid, (x - 1) % c_gridSize, (y + 1) % c_gridSize);
+            num_neighbours += get_grid_value(pSourceGrid, x, (y + 1) % c_gridSize);
+            num_neighbours += get_grid_value(pSourceGrid, (x + 1) % c_gridSize, (y + 1) % c_gridSize);
+
+            unsigned char next_generation = 0;
+
+            // Any live cell with two or three live neighbours survives.
+            if (get_grid_value(pSourceGrid, x, y) == 1)
+            {
+                // Any live cell with two or three live neighbours survives.
+                if ((num_neighbours > 1) && (num_neighbours < 4))
+                {
+                    next_generation = 1;
+                }
+            }
+            else
+            {
+                // Any dead cell with three live neighbours becomes a live cell.
+                if (num_neighbours == 3)
+                {
+                    next_generation = 1;
+                }
+            }
+            // All other live cells die in the next generation.Similarly, all other dead cells stay dead.
+            *(pDestGrid + (y * c_gridSize) + x) = next_generation;
+        }
+    }
+}
+
 // Updates the world.
 void Game::Update(DX::StepTimer const& timer)
 {
     float elapsedTime = float(timer.GetElapsedSeconds());
 
-    // TODO: Add your game logic here.
+    if (m_currentGrid < 0)
+    {
+        initialise_grid(&m_lifeGrids[0][0][0]);
+        m_currentGrid = 0;
+    }
+    else
+    {
+        update_grid(&m_lifeGrids[m_currentGrid][0][0], &m_lifeGrids[m_currentGrid ^ 1][0][0]);
+        m_currentGrid ^= 1;
+    }
+
     elapsedTime;
 }
 
@@ -1521,7 +1588,7 @@ void Game::CreateCubeBuffers(DXGI_FORMAT depthBufferFormat, UINT backBufferWidth
     // increment the fence value now, otherwise the buffer might not be uploaded by the time we start drawing
     //fenceValue[frameIndex]++;
     //DX::ThrowIfFailed(m_commandList->Signal(fence[frameIndex], fenceValue[frameIndex]));
-    WaitForGpu();
+    WaitForPreviousFrame();
 }
 
 

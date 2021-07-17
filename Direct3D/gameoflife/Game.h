@@ -58,6 +58,11 @@ private:
 
     int LoadImageDataFromFile(BYTE** imageData, D3D12_RESOURCE_DESC& resourceDescription, LPCWSTR filename, int& bytesPerRow);
 
+    void initialise_grid(unsigned char*);
+    unsigned char get_grid_value(unsigned char*, int, int);
+    void update_grid(unsigned char*, unsigned char*);
+
+
     // Application state
     HWND                                                m_window;
     int                                                 m_outputWidth;
@@ -83,7 +88,6 @@ private:
     Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>   m_commandList;
     Microsoft::WRL::ComPtr<ID3D12Fence>                 m_fences[c_swapBufferCount];
     UINT64                                              m_fenceValues[c_swapBufferCount];
-    //Microsoft::WRL::Wrappers::Event                     m_fenceEvent;
     HANDLE                                              m_fenceEvent;
 
     // Rendering resources
@@ -98,6 +102,14 @@ private:
     D3D12_VERTEX_BUFFER_VIEW                            m_vertexBufferView;
     D3D12_INDEX_BUFFER_VIEW                             m_indexBufferView;
 
+    static const int                                    c_gridSize = 32;
+    static const int                                    c_numCubes = c_gridSize * c_gridSize;
+
+    DirectX::XMFLOAT4X4                                 cubeWorldMats[c_numCubes]; // our first cubes world matrix (transformation matrix)
+    DirectX::XMFLOAT4                                   cubePositions[c_numCubes]; // our first cubes position in space
+
+    unsigned char                                       m_lifeGrids[2][c_gridSize][c_gridSize];
+    int                                                 m_currentGrid;
 
 
     // Game state
