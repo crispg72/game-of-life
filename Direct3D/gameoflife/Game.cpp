@@ -31,7 +31,7 @@ Game::Game() noexcept :
 Game::~Game()
 {
     // Ensure that the GPU is no longer referencing resources that are about to be destroyed.
-    WaitForGpu();
+    WaitForPreviousFrame();
 }
 
 // Initialize the Direct3D resources required to run.
@@ -89,6 +89,8 @@ void Game::Render()
     // Prepare the command list to render a new frame.
     Clear();
     
+    DrawCubes();
+
     // transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
     // warning if present is called on the render target when it's not in the present state
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -109,9 +111,6 @@ void Game::Render()
     // present the current backbuffer
     DX::ThrowIfFailed(m_swapChain->Present(0, 0));
     
-    // TODO: Add your rendering code here.
-    //DrawCubes();
-
     // Show the new frame.
     //Present();
 }
@@ -1018,26 +1017,6 @@ void Game::CreateResources()
     m_indexBufferView.SizeInBytes = iBufferSize;
 
     // TODO: Initialize windows-size dependent objects here.
-}
-
-void Game::WaitForGpu() noexcept
-{/*
-    if (m_commandQueue && m_fence && m_fenceEvent.IsValid())
-    {
-        // Schedule a Signal command in the GPU queue.
-        UINT64 fenceValue = m_fenceValues[m_backBufferIndex];
-        if (SUCCEEDED(m_commandQueue->Signal(m_fence.Get(), fenceValue)))
-        {
-            // Wait until the Signal has been processed.
-            if (SUCCEEDED(m_fence->SetEventOnCompletion(fenceValue, m_fenceEvent.Get())))
-            {
-                WaitForSingleObjectEx(m_fenceEvent.Get(), INFINITE, FALSE);
-
-                // Increment the fence value for the current frame.
-                m_fenceValues[m_backBufferIndex]++;
-            }
-        }
-    }*/
 }
 
 void Game::MoveToNextFrame()

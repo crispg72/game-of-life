@@ -51,7 +51,6 @@ private:
     void CreateDevice();
     void CreateResources();
 
-    void WaitForGpu() noexcept;
     void MoveToNextFrame();
     void GetAdapter(IDXGIAdapter1** ppAdapter);
 
