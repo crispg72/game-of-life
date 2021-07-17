@@ -83,7 +83,17 @@ void Game::Render()
 
     HRESULT hr;
 
-    //UpdatePipeline(); // update the pipeline by sending commands to the commandqueue
+    // We have to wait for the gpu to finish with the command allocator before we reset it
+    WaitForPreviousFrame();
+
+    // Prepare the command list to render a new frame.
+    Clear();
+    
+    // transition the "frameIndex" render target from the render target state to the present state. If the debug layer is enabled, you will receive a
+    // warning if present is called on the render target when it's not in the present state
+    m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+
+    hr = m_commandList->Close();
 
     // create an array of command lists (only one command list here)
     ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
@@ -98,15 +108,35 @@ void Game::Render()
 
     // present the current backbuffer
     DX::ThrowIfFailed(m_swapChain->Present(0, 0));
-
-    // Prepare the command list to render a new frame.
-    //Clear();
-
+    
     // TODO: Add your rendering code here.
     //DrawCubes();
 
     // Show the new frame.
     //Present();
+}
+
+void Game::WaitForPreviousFrame()
+{
+    HRESULT hr;
+
+    // swap the current rtv buffer index so we draw on the correct buffer
+    m_backBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+
+    // if the current fence value is still less than "fenceValue", then we know the GPU has not finished executing
+    // the command queue since it has not reached the "commandQueue->Signal(fence, fenceValue)" command
+    if (m_fences[m_backBufferIndex]->GetCompletedValue() < m_fenceValues[m_backBufferIndex])
+    {
+        // we have the fence create an event which is signaled once the fence's current value is "fenceValue"
+        DX::ThrowIfFailed(m_fences[m_backBufferIndex]->SetEventOnCompletion(m_fenceValues[m_backBufferIndex], m_fenceEvent));
+
+        // We will wait until the fence has triggered the event that it's current value has reached "fenceValue". once it's value
+        // has reached "fenceValue", we know the command queue has finished executing
+        WaitForSingleObject(m_fenceEvent, INFINITE);
+    }
+
+    // increment fenceValue for next frame
+    m_fenceValues[m_backBufferIndex]++;
 }
 
 // Helper method to prepare the command list for rendering and clear the back buffers.
@@ -117,17 +147,23 @@ void Game::Clear()
     DX::ThrowIfFailed(m_commandList->Reset(m_commandAllocators[m_backBufferIndex].Get(), m_pipelineStateObject));
 
     // Transition the render target into the correct state to allow for drawing into it.
-    D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_backBufferIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+    D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        m_renderTargets[m_backBufferIndex].Get(), 
+        D3D12_RESOURCE_STATE_PRESENT, 
+        D3D12_RESOURCE_STATE_RENDER_TARGET
+    );
     m_commandList->ResourceBarrier(1, &barrier);
 
     // Clear the views.
-    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(
+    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(
         m_rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(),
-        static_cast<INT>(m_backBufferIndex), m_rtvDescriptorSize);
-    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvDescriptor(m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-    m_commandList->OMSetRenderTargets(1, &rtvDescriptor, FALSE, &dsvDescriptor);
-    m_commandList->ClearRenderTargetView(rtvDescriptor, Colors::CornflowerBlue, 0, nullptr);
-    m_commandList->ClearDepthStencilView(m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+        static_cast<INT>(m_backBufferIndex), 
+        m_rtvDescriptorSize
+    );
+    CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(m_dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+    m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+    m_commandList->ClearRenderTargetView(rtvHandle, Colors::CornflowerBlue, 0, nullptr);
+    m_commandList->ClearDepthStencilView(m_dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
     // set root signature
     m_commandList->SetGraphicsRootSignature(m_rootSignature); // set the root signature
@@ -1465,7 +1501,6 @@ void Game::CreateCubeBuffers(DXGI_FORMAT depthBufferFormat, UINT backBufferWidth
     srvDesc.Texture2D.MipLevels = 1;
     m_d3dDevice->CreateShaderResourceView(textureBuffer, &srvDesc, m_textureDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-    
     UINT64 heapSizeIn64KB = (1 * ConstantBufferPerObjectAlignedSize) / 65536;
     if (!heapSizeIn64KB)
     {

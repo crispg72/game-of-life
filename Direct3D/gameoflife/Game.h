@@ -42,6 +42,7 @@ private:
     void Update(DX::StepTimer const& timer);
     void Render();
 
+    void WaitForPreviousFrame();
     void Clear();
     void CreateCubeBuffers(DXGI_FORMAT, UINT, UINT);
     void DrawCubes();
