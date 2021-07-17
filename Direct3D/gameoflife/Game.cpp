@@ -74,10 +74,6 @@ void Game::initialise_grid(unsigned char* pGrid)
             *(pGrid + ((y * c_gridSize) + x)) = (unsigned char)(rand() & 1);
 
             cubePositions[(y * c_gridSize) + x] = XMFLOAT4((-(c_gridSize * cellSize) / 2.0f) + (x * cellSize), (-(c_gridSize * cellSize) / 2.0f) + (y * cellSize), 0.0f, 0.0f); // set cube's position
-            /*XMVECTOR posVec = XMLoadFloat4(&cubePositions[(y * c_gridSize) + x]); // create xmvector for cube1's position
-
-            tmpMat = XMMatrixTranslationFromVector(posVec); // create translation matrix from cube's position vector
-            XMStoreFloat4x4(&cubeWorldMats[(y * gridSize) + x], tmpMat); // store cube's world matrix*/
         }
     }
 }
@@ -974,7 +970,7 @@ void Game::CreateResources()
     // 16 floats in one constant buffer, and we will store 2 constant buffers in each
     // heap, one for each cube, thats only 64x2 bits, or 128 bits we are using for each
     // resource, and each resource must be at least 64KB (65536 bits)
-    UINT64 heapSizeIn64KB = (1 * ConstantBufferPerObjectAlignedSize) / 65536;
+    UINT64 heapSizeIn64KB = (c_numCubes * ConstantBufferPerObjectAlignedSize) / 65536;
     if (!heapSizeIn64KB)
     {
         heapSizeIn64KB++;
@@ -991,8 +987,6 @@ void Game::CreateResources()
             IID_PPV_ARGS(&m_constantBufferUploadHeaps[i]))
         );
         m_constantBufferUploadHeaps[i]->SetName(L"Constant Buffer Upload Resource Heap");
-
-        //ZeroMemory(&cbPerObject, sizeof(cbPerObject));
 
         CD3DX12_RANGE readRange(0, 0);	// We do not intend to read from this resource on the CPU. (so end is less than or equal to begin)
 
