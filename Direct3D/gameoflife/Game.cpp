@@ -25,7 +25,7 @@ Game::Game() noexcept :
     m_backBufferIndex(0),
     m_rtvDescriptorSize(0),
     m_fenceValues{},
-    m_currentGrid(0)
+    m_currentGrid(-1)
 {
 }
 
@@ -66,11 +66,18 @@ void Game::Tick()
 
 void Game::initialise_grid(unsigned char* pGrid)
 {
+    float cellSize = 1.4f;
     for (int y = 0; y < c_gridSize; ++y)
     {
         for (int x = 0; x < c_gridSize; ++x)
         {
             *(pGrid + ((y * c_gridSize) + x)) = (unsigned char)(rand() & 1);
+
+            cubePositions[(y * c_gridSize) + x] = XMFLOAT4((-(c_gridSize * cellSize) / 2.0f) + (x * cellSize), (-(c_gridSize * cellSize) / 2.0f) + (y * cellSize), 0.0f, 0.0f); // set cube's position
+            /*XMVECTOR posVec = XMLoadFloat4(&cubePositions[(y * c_gridSize) + x]); // create xmvector for cube1's position
+
+            tmpMat = XMMatrixTranslationFromVector(posVec); // create translation matrix from cube's position vector
+            XMStoreFloat4x4(&cubeWorldMats[(y * gridSize) + x], tmpMat); // store cube's world matrix*/
         }
     }
 }
@@ -283,39 +290,38 @@ void Game::DrawCubes()
     XMVECTOR cTarg = XMLoadFloat4(&cameraTarget);
     XMVECTOR cUp = XMLoadFloat4(&cameraUp);
     XMMATRIX cameraViewMat = XMMatrixLookAtLH(cPos, cTarg, cUp);
-
-    // update constant buffer for cube
-    // create the wvp matrix and store in constant buffer
-    XMMATRIX wvpMat = cameraViewMat * cameraProjMat; // create wvp matrix
-    XMMATRIX transposed = XMMatrixTranspose(wvpMat); // must transpose wvp matrix for the gpu
-
-    ConstantBufferPerObject cbPerObject; // this is the constant buffer data we will send to the gpu 
-    XMStoreFloat4x4(&cbPerObject.wvpMat, transposed); // store transposed wvp matrix in constant buffer
-
-    // copy our ConstantBuffer instance to the mapped constant buffer resource
-    memcpy(m_cbvGPUAddress[m_backBufferIndex], &cbPerObject, sizeof(cbPerObject));
-
-    // set cube's constant buffer
-    m_commandList->SetGraphicsRootConstantBufferView(0, m_constantBufferUploadHeaps[m_backBufferIndex]->GetGPUVirtualAddress());
-
-    // draw first cube
-    m_commandList->DrawIndexedInstanced(m_numCubeIndices, 1, 0, 0, 0);
-
+    
     // draw cubes
-    /*for (UINT64 y = 0; y < gridSize; ++y)
+    for (UINT64 y = 0; y < c_gridSize; ++y)
     {
-        for (UINT64 x = 0; x < gridSize; ++x)
+        for (UINT64 x = 0; x < c_gridSize; ++x)
         {
-            if (lifeGrids[currentGrid][y][x])
+            if (m_lifeGrids[m_currentGrid][y][x])
             {
+                UINT64 cubeIndex = (y * c_gridSize) + x;
+
+                // create translation matrix for cube 1 from cube 1's position vector
+                XMMATRIX worldMat = XMMatrixTranslationFromVector(XMLoadFloat4(&cubePositions[cubeIndex]));
+
+                // update constant buffer for cube
+                // create the wvp matrix and store in constant buffer
+                XMMATRIX wvpMat = worldMat * cameraViewMat * cameraProjMat; // create wvp matrix
+                XMMATRIX transposed = XMMatrixTranspose(wvpMat); // must transpose wvp matrix for the gpu
+
+                ConstantBufferPerObject cbPerObject; // this is the constant buffer data we will send to the gpu 
+                XMStoreFloat4x4(&cbPerObject.wvpMat, transposed); // store transposed wvp matrix in constant buffer
+
+                // copy our ConstantBuffer instance to the mapped constant buffer resource
+                memcpy(m_cbvGPUAddress[m_backBufferIndex] + (ConstantBufferPerObjectAlignedSize * cubeIndex), &cbPerObject, sizeof(cbPerObject));
+
                 // set cube's constant buffer
-                m_commandList->SetGraphicsRootConstantBufferView(0, constantBufferUploadHeaps[frameIndex]->GetGPUVirtualAddress() + (((y * gridSize) + x) * ConstantBufferPerObjectAlignedSize));
+                m_commandList->SetGraphicsRootConstantBufferView(0, m_constantBufferUploadHeaps[m_backBufferIndex]->GetGPUVirtualAddress() + (((y * c_gridSize) + x) * ConstantBufferPerObjectAlignedSize));
 
                 // draw first cube
-                m_commandList->DrawIndexedInstanced(numCubeIndices, 1, 0, 0, 0);
+                m_commandList->DrawIndexedInstanced(m_numCubeIndices, 1, 0, 0, 0);
             }
         }
-    }*/
+    }
 }
 
 // Submits the command list to the GPU and presents the back buffer contents to the screen.
