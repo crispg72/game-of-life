@@ -45,12 +45,9 @@ void Game::Initialize(HWND window, int width, int height)
     CreateDevice();
     CreateResources();
 
-    // TODO: Change the timer settings if you want something other than the default variable timestep mode.
-    // e.g. for 60 FPS fixed timestep update logic, call:
-    /*
+    // 60 FPS fixed timestep update logic, call:
     m_timer.SetFixedTimeStep(true);
     m_timer.SetTargetElapsedSeconds(1.0 / 60);
-    */
 }
 
 // Executes the basic game loop.
